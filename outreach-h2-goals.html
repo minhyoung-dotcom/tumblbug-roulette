@@ -1,0 +1,413 @@
+<title>아웃리치 H2 잔여 목표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 한 열 작업지. 위에서 격차 요약 → 레버 편집기 → 누적 경로 차트 → 월/주 목표 → 카테고리·마감 일정 순서로 내려가며 읽는다. */
+:root {
+  --bg: #F3F4F6;
+  --surface: #FFFFFF;
+  --ink: #16191F;
+  --muted: #5D6472;
+  --line: #DADDE3;
+  --accent: #2647B8;
+  --accent-soft: #E6EBFA;
+  --good: #187A4B;
+  --warn: #B26A00;
+  --bad: #C2372B;
+  --pace: #8A90A0;
+  --base: #B26A00;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111318; --surface: #1A1D24; --ink: #E8EAEE; --muted: #9AA1AE; --line: #2D323C;
+    --accent: #7D97F2; --accent-soft: #232C47; --good: #4CC48A; --warn: #E3A34A; --bad: #F07468;
+    --pace: #7A8090; --base: #E3A34A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111318; --surface: #1A1D24; --ink: #E8EAEE; --muted: #9AA1AE; --line: #2D323C;
+  --accent: #7D97F2; --accent-soft: #232C47; --good: #4CC48A; --warn: #E3A34A; --bad: #F07468;
+  --pace: #7A8090; --base: #E3A34A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; margin: 0; }
+.wrap { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 28px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.25; }
+h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.15rem; font-weight: 700; }
+h3 { font-size: 0.95rem; font-weight: 700; }
+p { margin: 0; }
+.num, input[type="number"] { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+
+header { display: grid; gap: 8px; }
+header .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--muted); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; }
+
+/* 요약 */
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stat { background: var(--surface); padding: 16px; display: grid; gap: 4px; align-content: start; }
+.stat .v { font-family: var(--font-num); font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em; }
+.stat .v small { font-size: 0.85rem; color: var(--muted); font-weight: 500; margin-left: 2px; }
+.stat .d { font-size: 0.8rem; color: var(--muted); }
+.stat.hero .v { color: var(--accent); }
+@media (max-width: 720px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 진행 바 */
+.bar { position: relative; height: 26px; background: var(--bg); border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.bar span { position: absolute; top: 0; bottom: 0; }
+.bar .done { left: 0; background: var(--ink); }
+.bar .plan { background: var(--accent); opacity: 0.85; }
+.bar .target { width: 2px; background: var(--bad); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* 상태 칩 */
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.chip.good { color: var(--good); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+
+/* 편집기 */
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: inherit; cursor: pointer; }
+.btn { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.core { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 720px) { .core { grid-template-columns: 1fr; } }
+.field { display: grid; gap: 6px; background: var(--bg); border-radius: 8px; padding: 12px; min-width: 0; }
+.field label { font-size: 0.82rem; color: var(--muted); font-weight: 500; }
+.field .row { display: flex; align-items: center; gap: 10px; }
+.field input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+input[type="number"] { width: 84px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 0.9rem; text-align: right; }
+.field .hint { font-size: 0.78rem; color: var(--muted); }
+
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 0.75rem; color: var(--muted); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap; }
+td.r, th.r { text-align: right; }
+td .why { display: block; font-size: 0.78rem; color: var(--muted); }
+tfoot td { font-weight: 700; border-bottom: none; }
+.lever-table td:first-child { min-width: 200px; }
+
+.result { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; padding: 14px 16px; border-radius: 8px; background: var(--accent-soft); }
+.result .big { font-family: var(--font-num); font-size: 1.35rem; font-weight: 600; }
+
+/* 차트 */
+.chart-box { overflow-x: auto; }
+svg text { font-family: var(--font-body); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+
+.months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 560px) { .months { grid-template-columns: 1fr; } }
+.month { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 4px; }
+.month .v { font-family: var(--font-num); font-size: 1.3rem; font-weight: 600; }
+
+.cat { display: grid; gap: 6px; }
+.cat .top { display: flex; justify-content: space-between; gap: 8px; font-size: 0.88rem; }
+
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.timeline li { display: grid; grid-template-columns: 76px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.timeline li:last-child { border-bottom: none; }
+.timeline .date { font-family: var(--font-num); font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+
+.notes { font-size: 0.8rem; color: var(--muted); display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">아웃리치 · 2026 하반기 OB</span>
+    <h1>남은 14주, 69.2억을 어디서 만들지</h1>
+    <p class="muted">Q3 실적과 최근 페이스를 출발점으로 두고, 레버별 목표를 조정해 H2 OB 105억까지의 계획을 세웁니다. 값을 바꾸면 차트와 월·주 목표가 바로 다시 계산됩니다.</p>
+    <div class="meta">
+      <span>기준: Q3 = 6/29주~9/21주 (13주)</span>
+      <span>잔여: 9/28주~12/28주 (14주)</span>
+      <span>출처: 아웃리치 대시보드 · 아웃리치 Q3 점검 (수퍼셋 9/29 추출)</span>
+    </div>
+  </header>
+
+  <section class="summary" aria-label="현재 위치">
+    <div class="stat"><span class="eyebrow">Q3 달성 OB</span><span class="v num">35.8<small>억</small></span><span class="d">H2 목표 105억의 34.1%</span></div>
+    <div class="stat hero"><span class="eyebrow">남은 필요액</span><span class="v num">69.2<small>억</small></span><span class="d">14주 남음</span></div>
+    <div class="stat"><span class="eyebrow">주당 필요</span><span class="v num">4.94<small>억</small></span><span class="d">최근 4주 페이스 3.33억 (−1.61억)</span></div>
+    <div class="stat"><span class="eyebrow">이대로면</span><span class="v num">82.5<small>억</small></span><span class="d">기준 예상 91.7억 · 목표 대비 −13.3~−22.5억</span></div>
+  </section>
+
+  <section class="panel" aria-labelledby="planner-h">
+    <div class="panel-head">
+      <div>
+        <h2 id="planner-h">목표 레버 편집기</h2>
+        <p class="muted small">기본 페이스(주당 론치 × 론치당 OB)에 추가 레버를 얹어 남은 14주 OB를 만듭니다.</p>
+      </div>
+      <div class="presets" role="group" aria-label="프리셋">
+        <button class="btn" type="button" data-preset="pace" id="p-pace">최근 페이스 유지</button>
+        <button class="btn" type="button" data-preset="goal" id="p-goal">105억 달성안</button>
+      </div>
+    </div>
+
+    <div class="core">
+      <div class="field">
+        <label for="target">H2 OB 목표 (억)</label>
+        <div class="row"><input type="range" id="targetR" min="80" max="120" step="0.5" aria-label="H2 목표 슬라이더"><input type="number" id="target" min="0" step="0.5"></div>
+        <span class="hint">공식 목표 105억 (제품 37 + 콘텐츠 68)</span>
+      </div>
+      <div class="field">
+        <label for="launch">주당 론치 수 (건)</label>
+        <div class="row"><input type="range" id="launchR" min="20" max="60" step="0.5" aria-label="주당 론치 슬라이더"><input type="number" id="launch" min="0" step="0.5"></div>
+        <span class="hint">Q3 평균 29.9건 (389건/13주) · 최근 4주 환산 약 36건</span>
+      </div>
+      <div class="field">
+        <label for="per">론치당 OB (만원)</label>
+        <div class="row"><input type="range" id="perR" min="700" max="1300" step="10" aria-label="론치당 OB 슬라이더"><input type="number" id="per" min="0" step="10"></div>
+        <span class="hint">Q3 920만원 · 전년 Q3 1,052만원</span>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="lever-table">
+        <thead>
+          <tr><th>추가 레버 (현재 페이스 외)</th><th class="r">건수</th><th class="r">건당 OB (만원)</th><th class="r">14주 기여 (억)</th></tr>
+        </thead>
+        <tbody id="levers"></tbody>
+        <tfoot>
+          <tr><td>추가 레버 합계</td><td></td><td></td><td class="r num" id="leverSum"></td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="result" aria-live="polite">
+      <div><span class="eyebrow">계획 H2 마감</span><br><span class="big" id="planTotal"></span></div>
+      <div><span class="eyebrow">목표 대비</span><br><span class="big" id="planGap"></span></div>
+      <span class="chip" id="planChip"></span>
+      <p class="small" id="planNote" style="flex-basis:100%"></p>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="chart-h">
+    <div class="panel-head">
+      <h2 id="chart-h">누적 OB 경로</h2>
+      <div class="legend">
+        <span><i style="background:var(--bad)"></i>목표 경로</span>
+        <span><i style="background:var(--accent)"></i>내 계획</span>
+        <span><i style="background:var(--base)"></i>기준 예상</span>
+        <span><i style="background:var(--pace)"></i>최근 페이스</span>
+      </div>
+    </div>
+    <div class="chart-box"><svg id="chart" viewBox="0 0 880 320" width="100%" role="img" aria-label="9/21주 이후 누적 OB 경로 차트"></svg></div>
+    <div class="bar" aria-hidden="true"><span class="done" id="barDone"></span><span class="plan" id="barPlan"></span><span class="target" id="barTarget"></span></div>
+    <div class="legend"><span><i style="background:var(--ink)"></i>Q3 달성 35.8억</span><span><i style="background:var(--accent)"></i>잔여 계획</span><span><i style="background:var(--bad)"></i>목표선</span></div>
+  </section>
+
+  <section class="panel" aria-labelledby="month-h">
+    <div class="panel-head">
+      <h2 id="month-h">월별 · 주별 목표</h2>
+      <p class="muted small">계획을 주 단위로 균등 배분 (10월 5주 · 11월 5주 · 12월 4주)</p>
+    </div>
+    <div class="months" id="months"></div>
+    <p class="small muted" id="launchNeed"></p>
+  </section>
+
+  <div class="two">
+    <section class="panel" aria-labelledby="cat-h">
+      <h2 id="cat-h">파트별 잔여 목표</h2>
+      <div class="cat">
+        <div class="top"><h3>제품 OB</h3><span class="num">14.2 / 37억 · 38.3%</span></div>
+        <div class="bar"><span class="done" style="width:38.4%"></span><span class="target" style="left:calc(100% - 2px)"></span></div>
+        <p class="small muted">남은 22.8억 · 주당 1.63억 · 전년 대비 +12%로 유일한 성장 파트</p>
+      </div>
+      <div class="cat">
+        <div class="top"><h3>콘텐츠 OB</h3><span class="num">21.6 / 68억 · 31.8%</span></div>
+        <div class="bar"><span class="done" style="width:31.8%"></span><span class="target" style="left:calc(100% - 2px)"></span></div>
+        <p class="small muted">남은 46.4억 · 주당 3.31억 · 전년 대비 −9%, 재론치 창작자 −3.9억</p>
+      </div>
+      <div class="cat">
+        <div class="top"><h3>OKR 출판·패션</h3><span class="chip warn">진도 31~33%</span></div>
+        <p class="small muted">목표 전년 +20% 대비 −5.5~−6.6억 부족. 출판 A급 47→19개, 향수·뷰티 −50%</p>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="time-h">
+      <h2 id="time-h">마감 역산 일정</h2>
+      <p class="small muted">생성→론치 리드타임 23일 (전년 20일). 12/28주까지 론치하려면 딜이 언제 생겨야 하는지 거꾸로 계산했습니다.</p>
+      <ol class="timeline">
+        <li><span class="date">10/10</span><span>11/2주 론치분 딜 생성 마감. 라스트콜·프리미엄 재개 여부 이번 주 안에 결정</span></li>
+        <li><span class="date">11/08</span><span>12/1 론치분 생성 마감. S급 얼리패키지 2차 확정</span></li>
+        <li><span class="date">11/21</span><span>12/14주 연말 기획전 론치분 생성 마감</span></li>
+        <li><span class="date">12/08</span><span>12/31까지 론치 가능한 마지막 딜 생성일. 이후 딜은 2027 Q1로 이월</span></li>
+        <li><span class="date">매주 월</span><span>대시보드 '데이터 점검'에서 확정 후 미론치 딜·오래 머문 딜 정리</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="src-h">
+    <h2 id="src-h">레버 단가 근거</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>항목</th><th class="r">작년 Q3</th><th class="r">올해 Q3</th><th>메모</th></tr></thead>
+        <tbody>
+          <tr><td>팬콜</td><td class="r num">0.3억 · 26개</td><td class="r num">3.8억 · 131개</td><td>개당 약 290만원, 5배 성장</td></tr>
+          <tr><td>S급 얼리패키지</td><td class="r num">—</td><td class="r num">2.9억 · 7개</td><td>개당 약 4,140만원, 신규</td></tr>
+          <tr><td>외부기관 파트너</td><td class="r num">0.3억 · 2개</td><td class="r num">2.7억 · 20개</td><td>개당 약 1,350만원</td></tr>
+          <tr><td>라스트콜</td><td class="r num">1.0억 · 12개</td><td class="r num">0</td><td>중단, 재개 시 개당 약 830만원</td></tr>
+          <tr><td>프리미엄 신청</td><td class="r num">0.8억 · 9개</td><td class="r num">0</td><td>중단, 재개 시 개당 약 890만원</td></tr>
+          <tr><td>콜드컨택 A급</td><td class="r num">5.8억 · A급 17</td><td class="r num">3.3억 · A급 10</td><td>A급 1건 회복당 약 3,570만원</td></tr>
+          <tr><td>문구/굿즈·출판 S급</td><td class="r num">S급 7 / 4</td><td class="r num">S급 3 / 1</td><td>문구 S급 4건 감소로 −8.7억 (전체 후원액). OB 기준 건당 1.5억 가정</td></tr>
+          <tr><td>론치당 OB</td><td class="r num">1,052만원</td><td class="r num">920만원</td><td>제안 +18%, 확정 +39%인데 딜 크기 −13%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="notes">
+      <p>· 레버 기여는 건수 × 건당 OB 단순 곱입니다. 기본 페이스와 겹치는 부분(이미 페이스에 포함된 팬콜 등)은 '추가분' 건수만 넣어야 이중 계산이 되지 않습니다.</p>
+      <p>· 이니셔티브 단가는 Q3 점검의 채널별 실적(합계가 OB 변화 −0.6억과 일치)을 건수로 나눈 값입니다. S급 단가는 가정이므로 담당 파트와 확인하세요.</p>
+      <p>· 최근 4주 페이스와 예상 마감액은 9/29 추출 기준입니다. 10월 실적이 쌓이면 대시보드 수치로 'Q3 달성'과 기본 페이스를 갱신하세요.</p>
+      <p>· 입력값은 이 브라우저에만 저장됩니다.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const DONE = 35.8, WEEKS = 14, PACE = 3.33, BASE_END = 91.7;
+  const MONTHS = [["10월", 5, "9/28~10/26주"], ["11월", 5, "11/2~11/30주"], ["12월", 4, "12/7~12/28주"]];
+  const LEVERS = [
+    { id: "s", name: "문구/굿즈·출판 S급 확보", why: "문구 S급 7→3, 출판 4→1 회복", unit: 15000 },
+    { id: "early", name: "S급 얼리패키지 확대", why: "Q3 7개 2.9억", unit: 4140 },
+    { id: "fan", name: "팬콜 추가", why: "Q3 131개 3.8억", unit: 290 },
+    { id: "partner", name: "외부기관 파트너 추가", why: "Q3 20개 2.7억", unit: 1350 },
+    { id: "cold", name: "콜드컨택 A급 회복", why: "A급 17→10개, −2.5억", unit: 3570 },
+    { id: "last", name: "라스트콜 재개", why: "작년 Q3 12개 1.0억", unit: 830 },
+    { id: "prem", name: "프리미엄 신청 재개", why: "작년 Q3 9개 0.8억", unit: 890 }
+  ];
+  const PRESETS = {
+    pace: { target: 105, launch: 36.2, per: 920, s: 0, early: 0, fan: 0, partner: 0, cold: 0, last: 0, prem: 0 },
+    goal: { target: 105, launch: 38, per: 1000, s: 4, early: 5, fan: 60, partner: 15, cold: 7, last: 12, prem: 9 }
+  };
+  const KEY = "outreach-h2-plan-v1";
+  let st = Object.assign({}, PRESETS.goal);
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved) st = Object.assign(st, saved); } catch (e) {}
+
+  const $ = (id) => document.getElementById(id);
+  const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
+  const f2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
+
+  const tb = $("levers");
+  tb.innerHTML = LEVERS.map((l) =>
+    `<tr><td>${l.name}<span class="why">${l.why}</span></td>
+     <td class="r"><input type="number" id="c-${l.id}" min="0" step="1" aria-label="${l.name} 건수"></td>
+     <td class="r"><input type="number" id="u-${l.id}" min="0" step="10" aria-label="${l.name} 건당 OB"></td>
+     <td class="r num" id="v-${l.id}"></td></tr>`).join("");
+  LEVERS.forEach((l) => { if (st["u_" + l.id] == null) st["u_" + l.id] = l.unit; });
+
+  function sync() {
+    $("target").value = st.target; $("targetR").value = st.target;
+    $("launch").value = st.launch; $("launchR").value = st.launch;
+    $("per").value = st.per; $("perR").value = st.per;
+    LEVERS.forEach((l) => { $("c-" + l.id).value = st[l.id]; $("u-" + l.id).value = st["u_" + l.id]; });
+  }
+
+  function compute() {
+    const base = st.launch * st.per * WEEKS / 10000;
+    let lev = 0;
+    LEVERS.forEach((l) => { const v = (+st[l.id] || 0) * (+st["u_" + l.id] || 0) / 10000; lev += v; $("v-" + l.id).textContent = f1(v); });
+    return { base, lev, rem: base + lev, total: DONE + base + lev };
+  }
+
+  function render() {
+    const c = compute(), T = +st.target || 0, gap = c.total - T;
+    $("leverSum").textContent = f1(c.lev);
+    $("planTotal").textContent = f1(c.total) + "억";
+    $("planGap").textContent = (gap >= 0 ? "+" : "") + f1(gap) + "억";
+    const chip = $("planChip");
+    chip.className = "chip " + (gap >= 0 ? "good" : gap > -8 ? "warn" : "bad");
+    chip.textContent = gap >= 0 ? "목표 달성" : gap > -8 ? "근접" : "부족";
+    $("planNote").textContent = `기본 페이스 ${f1(c.base)}억 (주 ${f1(st.launch)}건 × ${Math.round(st.per).toLocaleString()}만원 × 14주) + 추가 레버 ${f1(c.lev)}억. 주당 ${f2(c.rem / WEEKS)}억으로, 최근 4주 페이스 ${PACE}억의 ${Math.round(c.rem / WEEKS / PACE * 100)}%입니다.`;
+
+    const wk = c.rem / WEEKS;
+    $("months").innerHTML = MONTHS.map(([m, w, r]) =>
+      `<div class="month"><span class="eyebrow">${m} · ${w}주</span><span class="v">${f1(wk * w)}억</span><span class="small muted">주 ${f2(wk)}억 · 론치 ${Math.round(st.launch * w)}건 · ${r}</span></div>`).join("");
+    const needL = (T - DONE - c.lev) / (WEEKS * st.per / 10000);
+    $("launchNeed").textContent = `추가 레버를 그대로 두고 목표 ${f1(T)}억을 맞추려면 론치당 ${Math.round(st.per).toLocaleString()}만원 기준 주당 ${Math.max(0, needL).toFixed(1)}건이 필요합니다 (Q3 평균 29.9건).`;
+
+    const max = Math.max(T, c.total, 105) * 1.04;
+    $("barDone").style.width = (DONE / max * 100) + "%";
+    $("barPlan").style.left = (DONE / max * 100) + "%";
+    $("barPlan").style.width = (c.rem / max * 100) + "%";
+    $("barTarget").style.left = `calc(${T / max * 100}% - 1px)`;
+
+    drawChart(c, T);
+    document.querySelectorAll("[data-preset]").forEach((b) => {
+      const p = PRESETS[b.dataset.preset];
+      const same = Object.keys(p).every((k) => +st[k] === +p[k]) && LEVERS.every((l) => +st["u_" + l.id] === l.unit);
+      b.setAttribute("aria-pressed", same ? "true" : "false");
+    });
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+  }
+
+  function drawChart(c, T) {
+    const W = 880, H = 320, L = 52, R = 150, Tp = 16, B = 40;
+    const ymin = 30, ymax = Math.ceil(Math.max(T, c.total, 105) / 10) * 10 + 5;
+    const x = (i) => L + (W - L - R) * i / WEEKS;
+    const y = (v) => Tp + (H - Tp - B) * (1 - (v - ymin) / (ymax - ymin));
+    let s = "";
+    for (let v = 40; v <= ymax; v += 10) {
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/>`;
+      s += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+    }
+    const ticks = [[0, "9/21"], [5, "10/26"], [10, "11/30"], [14, "12/28"]];
+    ticks.forEach(([i, t]) => { s += `<text x="${x(i)}" y="${H - B + 18}" text-anchor="middle" font-size="11" fill="var(--muted)">${t}주</text>`; });
+    s += `<text x="${L - 8}" y="${Tp - 2}" text-anchor="end" font-size="10" fill="var(--muted)">억</text>`;
+
+    const lines = [
+      { end: DONE + PACE * WEEKS, col: "var(--pace)", label: "최근 페이스", dash: "4 4", w: 2 },
+      { end: BASE_END, col: "var(--base)", label: "기준 예상", dash: "4 4", w: 2 },
+      { end: T, col: "var(--bad)", label: "목표", dash: "", w: 1.5 },
+      { end: c.total, col: "var(--accent)", label: "내 계획", dash: "", w: 3 }
+    ];
+    const area = `M${x(0)},${y(DONE)} L${x(WEEKS)},${y(c.total)} L${x(WEEKS)},${y(ymin)} L${x(0)},${y(ymin)} Z`;
+    s += `<path d="${area}" fill="var(--accent)" opacity="0.08"/>`;
+    // 라벨 겹침 방지: 끝값 기준 정렬 후 최소 간격 확보
+    const labs = lines.map((l) => ({ ...l, ly: y(l.end) })).sort((a, b) => a.ly - b.ly);
+    for (let i = 1; i < labs.length; i++) if (labs[i].ly - labs[i - 1].ly < 16) labs[i].ly = labs[i - 1].ly + 16;
+    lines.forEach((l) => {
+      s += `<line x1="${x(0)}" y1="${y(DONE)}" x2="${x(WEEKS)}" y2="${y(l.end)}" stroke="${l.col}" stroke-width="${l.w}" ${l.dash ? `stroke-dasharray="${l.dash}"` : ""} stroke-linecap="round"/>`;
+      s += `<circle cx="${x(WEEKS)}" cy="${y(l.end)}" r="${l.w + 1.5}" fill="${l.col}"/>`;
+    });
+    labs.forEach((l) => {
+      s += `<text x="${x(WEEKS) + 12}" y="${l.ly + 4}" font-size="12" fill="var(--ink)" font-weight="${l.label === "내 계획" ? 700 : 400}">${l.label} <tspan font-family="var(--font-num)" fill="${l.col}">${f1(l.end)}</tspan></text>`;
+    });
+    s += `<circle cx="${x(0)}" cy="${y(DONE)}" r="4" fill="var(--ink)"/>`;
+    s += `<text x="${x(0) + 8}" y="${y(DONE) - 8}" font-size="11" fill="var(--muted)">Q3 ${DONE}</text>`;
+    $("chart").innerHTML = s;
+  }
+
+  function bindPair(numId, rangeId, key) {
+    const set = (v) => { st[key] = +v || 0; sync(); render(); };
+    $(numId).addEventListener("input", (e) => { st[key] = +e.target.value || 0; $(rangeId).value = st[key]; render(); });
+    $(rangeId).addEventListener("input", (e) => set(e.target.value));
+  }
+  bindPair("target", "targetR", "target");
+  bindPair("launch", "launchR", "launch");
+  bindPair("per", "perR", "per");
+  LEVERS.forEach((l) => {
+    $("c-" + l.id).addEventListener("input", (e) => { st[l.id] = +e.target.value || 0; render(); });
+    $("u-" + l.id).addEventListener("input", (e) => { st["u_" + l.id] = +e.target.value || 0; render(); });
+  });
+  document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+    st = Object.assign({}, st, PRESETS[b.dataset.preset]);
+    LEVERS.forEach((l) => { st["u_" + l.id] = l.unit; });
+    sync(); render();
+  }));
+  sync(); render();
+})();
+</script>
